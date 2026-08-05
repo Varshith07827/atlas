@@ -70,6 +70,25 @@ create table if not exists public.workspace_members (
 
 create index if not exists workspace_members_user_idx on public.workspace_members(user_id);
 
+-- A second foreign key on the same column, pointing at profiles.
+--
+-- It looks redundant next to the auth.users reference, but PostgREST can only
+-- embed a related table when a foreign key joins them. The client asks for
+-- `workspace_members -> profile:profiles(*)` to show who is in a workspace, and
+-- without this it fails with "Could not find a relationship ... in the schema
+-- cache". auth.users is not exposed over the API, so it cannot serve as the
+-- join path.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'workspace_members_profile_fkey'
+  ) then
+    alter table public.workspace_members
+      add constraint workspace_members_profile_fkey
+      foreign key (user_id) references public.profiles(id) on delete cascade;
+  end if;
+end $$;
+
 -- The membership check has to run as SECURITY DEFINER. If a policy on
 -- workspace_members queried workspace_members directly, Postgres would recurse
 -- while evaluating that same policy.
@@ -331,9 +350,14 @@ create policy profiles_update on public.profiles for update
   using (id = auth.uid()) with check (id = auth.uid());
 
 -- workspaces -------------------------------------------------------------
+-- The owner clause is not redundant with the membership check. On first login
+-- the workspace row is inserted before its workspace_members row exists, so for
+-- one statement the creator is not yet a member. Without `owner_id = auth.uid()`
+-- an INSERT ... RETURNING (any .insert().select() from the client) has its
+-- returned row rejected by this policy and the whole insert rolls back.
 drop policy if exists workspaces_select on public.workspaces;
 create policy workspaces_select on public.workspaces for select
-  using (public.is_workspace_member(id));
+  using (owner_id = auth.uid() or public.is_workspace_member(id));
 
 drop policy if exists workspaces_insert on public.workspaces;
 create policy workspaces_insert on public.workspaces for insert

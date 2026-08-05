@@ -58,32 +58,46 @@ Running it twice is harmless, so if you're unsure, run it again.
 
 ### 3. Copy your keys
 
-1. Go to **Project Settings** (the gear icon) → **API**.
-2. Copy the **Project URL** and the **anon public** key.
-3. In this repository:
+1. Go to **Project Settings** (the gear icon) → **API Keys**.
+2. Copy the **Publishable key** (`sb_publishable_...`). This is the
+   browser-safe one. Ignore the **Secret keys** section entirely.
+3. Go to **Project Settings → General** and copy the **Project URL**.
+4. In this repository:
 
 ```bash
 cp .env.example .env.local
 ```
 
-4. Open `.env.local` and paste them in:
+5. Open `.env.local` and paste them in:
 
 ```
 VITE_SUPABASE_URL=https://abcdefgh.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
+VITE_SUPABASE_ANON_KEY=sb_publishable_...
 ```
 
-5. Restart the dev server (`Ctrl+C`, then `npm run dev`).
+6. Check it worked, then restart the dev server:
+
+```bash
+npm run check:supabase && npm run dev
+```
+
+`check:supabase` verifies the key is accepted, confirms all 14 tables exist,
+and proves row level security is working by trying to read your tables while
+signed out. If something's wrong it names the step to redo.
+
+> **Older projects** show a *Legacy anon, service_role API keys* tab instead.
+> The `anon` `public` key there (a long `eyJ...` token) works exactly the same.
 
 Atlas will now show a sign-in screen instead of loading straight in. Create an
 account and it'll set up your workspace with the same starter content.
 
-> **Is it safe to publish the anon key?** Yes. It's designed to be public — it
-> only identifies your project. What actually protects your data is row level
-> security, which `schema.sql` turns on for every single table. Every policy
-> derives your identity from the verified auth token, so nobody can read another
-> person's workspace by editing the key or the request. Never publish the
-> `service_role` key, though — that one bypasses all of it.
+> **Is it safe to publish that key?** Yes — publishable and anon keys are
+> designed to be public, and only identify your project. What actually protects
+> your data is row level security, which `schema.sql` turns on for every single
+> table. Every policy derives your identity from the verified auth token, so
+> nobody can read another person's workspace by editing the key or the request.
+> Never publish an `sb_secret_...` or `service_role` key, though — those bypass
+> all of it.
 
 ### 4. Skip email confirmation (optional, but do it while testing)
 

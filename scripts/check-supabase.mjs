@@ -75,7 +75,7 @@ console.log(`\n${c.bold('Checking your Supabase setup')}\n`)
 if (!url || !key) {
   fail(
     'No credentials in .env.local yet.',
-    'Open .env.local and paste the Project URL and anon key from Supabase → Project Settings → API.',
+    'Open .env.local and paste the Project URL and Publishable key from Supabase → Project Settings → API Keys.',
   )
 }
 
@@ -88,8 +88,8 @@ if (!/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(url)) {
 
 if (key.startsWith('sb_secret') || key.includes('service_role')) {
   fail(
-    'That looks like the service_role key, not the anon key.',
-    'The service_role key bypasses all security and must never go in a browser app. Copy the one labelled "anon public".',
+    'That is a secret key — it must never go in a browser app.',
+    'Secret keys bypass all security and must never go in a browser app. Copy the one under "Publishable key" instead.',
   )
 }
 
@@ -110,7 +110,7 @@ if (reachError) {
   if (/Invalid API key|JWT/i.test(reachError.message)) {
     fail(
       'The project is reachable but rejected the key.',
-      'Re-copy the "anon public" key from Project Settings → API.',
+      'Re-copy the Publishable key from Project Settings → API Keys.',
     )
   }
   if (/relation .* does not exist|Could not find the table/i.test(reachError.message)) {

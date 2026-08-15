@@ -556,10 +556,22 @@ begin
 end;
 $$;
 
-revoke all on function public.unpair_member(uuid, uuid) from public;
+-- Lock these down to signed-in callers.
+--
+-- `revoke ... from public` is not enough on Supabase: it grants EXECUTE on
+-- public-schema functions to the `anon` role explicitly, and revoking from
+-- PUBLIC leaves that grant in place. Both functions guard on
+-- is_workspace_owner() so an anonymous call is refused anyway — but these run
+-- SECURITY DEFINER, with database-owner privileges, so the guard should not be
+-- the only thing standing between an anonymous caller and them.
+--
+-- Note is_workspace_member/is_workspace_owner are deliberately NOT revoked
+-- from anon: RLS policies call them, and the querying role needs EXECUTE or
+-- signed-out reads would error instead of returning nothing.
+revoke all on function public.unpair_member(uuid, uuid) from public, anon;
 grant execute on function public.unpair_member(uuid, uuid) to authenticated;
 
-revoke all on function public.invite_member_by_email(uuid, text) from public;
+revoke all on function public.invite_member_by_email(uuid, text) from public, anon;
 grant execute on function public.invite_member_by_email(uuid, text) to authenticated;
 
 -- =============================================================================

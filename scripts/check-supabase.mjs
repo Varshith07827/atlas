@@ -7,6 +7,7 @@
  *   2. the project is reachable with that key
  *   3. every table schema.sql creates actually exists
  *   4. row level security is switched on (an anonymous read must return nothing)
+ *   5. the SECURITY DEFINER sharing functions refuse anonymous callers
  *
  * Run with:  npm run check:supabase
  */
@@ -21,6 +22,8 @@ const c = {
   dim: (s) => `\x1b[2m${s}${RESET}`,
   bold: (s) => `\x1b[1m${s}${RESET}`,
 }
+
+const ZERO_UUID = '00000000-0000-4000-8000-000000000000'
 
 const TABLES = [
   'profiles',
@@ -171,7 +174,35 @@ if (leaks.length) {
 
 console.log(`${c.ok('✓')} Row level security is on (signed-out reads return nothing)`)
 
-// --- 5. can people sign up? --------------------------------------------------
+// --- 5. are the SECURITY DEFINER functions closed to anonymous callers? -----
+
+// These run with database-owner privileges. They each guard on
+// is_workspace_owner(), but the guard should not be the only thing in the way —
+// and `revoke ... from public` alone does not remove Supabase's explicit grant
+// to the `anon` role, which is exactly the gap this catches.
+const rpcProbes = [
+  ['invite_member_by_email', { p_workspace_id: ZERO_UUID, p_email: 'nobody@example.invalid' }],
+  ['unpair_member', { p_workspace_id: ZERO_UUID, p_user_id: ZERO_UUID }],
+]
+
+const reachable = []
+for (const [fn, args] of rpcProbes) {
+  const { error } = await supabase.rpc(fn, args)
+  // 42501 = insufficient privilege: refused before the body ran. Anything else
+  // (including the function's own "only the owner can…") means it executed.
+  if (error?.code !== '42501') reachable.push(fn)
+}
+
+if (reachable.length) {
+  console.log(`${c.warn('!')} Anonymous callers can execute: ${reachable.join(', ')}`)
+  console.log(
+    `  ${c.dim('Run supabase/migrations/002_lock_rpcs_to_authenticated.sql to revoke them from the anon role.')}`,
+  )
+} else {
+  console.log(`${c.ok('✓')} Sharing functions refuse anonymous callers`)
+}
+
+// --- 6. can people sign up? --------------------------------------------------
 
 const { data: settings } = await fetch(`${url}/auth/v1/settings`, {
   headers: { apikey: key },

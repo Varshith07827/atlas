@@ -1,5 +1,6 @@
 import type {
   AppNotification,
+  Workspace,
   CalendarEvent,
   Comment,
   Habit,
@@ -96,6 +97,9 @@ export interface Backend {
 
   /** Rename a workspace. Owner only — the database enforces that too. */
   renameWorkspace(id: string, name: string): Promise<void>
+
+  /** Every workspace the user can reach, for the switcher. */
+  listWorkspaces(userId: string): Promise<Workspace[]>
 
   /** Workspace sharing. Local mode reports these as unsupported. */
   inviteMember(email: string): Promise<WorkspaceMember>

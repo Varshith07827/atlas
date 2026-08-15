@@ -834,25 +834,36 @@ export const useData = create<DataState>((set, get) => {
 
     // -------------------------------------------------------------- members
 
+    /**
+     * Pairing is mutual: they join your workspace and you join theirs. So this
+     * also refreshes the workspace list, otherwise the switcher wouldn't show
+     * the one you just gained access to until the next reload.
+     */
     async inviteMember(email) {
-      const backend = get().backend
-      if (!backend) return
+      const { backend, user } = get()
+      if (!backend || !user) return
       try {
         const member = await backend.inviteMember(email)
         set({ members: [...get().members.filter((m) => m.user_id !== member.user_id), member] })
-        toast.success(`${member.profile?.display_name ?? email} joined the workspace`)
+        const who = member.profile?.display_name ?? member.profile?.email ?? email
+        toast.success(`Now sharing with ${who}`, {
+          description: 'You can switch between both workspaces from the sidebar.',
+        })
+        set({ workspaces: await backend.listWorkspaces(user.id) })
       } catch (err) {
         toast.error((err as Error).message)
       }
     },
 
     async removeMember(userId) {
-      const backend = get().backend
-      if (!backend) return
+      const { backend, user } = get()
+      if (!backend || !user) return
       const before = get().members
       set({ members: before.filter((m) => m.user_id !== userId) })
       try {
         await backend.removeMember(userId)
+        // Their workspace disappears from the switcher at the same time.
+        set({ workspaces: await backend.listWorkspaces(user.id) })
       } catch (err) {
         set({ members: before })
         toast.error((err as Error).message)

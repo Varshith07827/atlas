@@ -114,10 +114,19 @@ turn it back on later once you've wired up a real mail provider.
 2. You go to **Settings → Workspace**, type their email, and click **Invite**.
    Only the workspace owner can do this.
 
-Everyone keeps their **own** workspace and can switch into any they've been
-invited to, using the switcher at the top of the sidebar. It only appears once
-you can reach more than one. Your choice is remembered per device, so your
-laptop and your phone can sit in different workspaces.
+Inviting is **mutual**: they join your workspace and you join theirs, in one
+step. Both of you keep your own workspace and switch between the two using the
+switcher at the top of the sidebar. It only appears once you can reach more
+than one, and your choice is remembered per device, so your laptop and your
+phone can sit in different workspaces.
+
+Removing someone undoes both directions at once — otherwise "removed" people
+would keep read access to your side.
+
+> Worth knowing: there is no accept step. The moment you invite someone, each
+> of you can read and write the other's workspace. That's the intent for two
+> people who trust each other; it is not a model for strangers. Per-item
+> `private` flags still apply in both directions.
 
 **What the other person can see**
 

@@ -280,6 +280,18 @@ export class SupabaseBackend implements Backend {
     if (error) throw error
   }
 
+  async listWorkspaces(userId: string): Promise<Workspace[]> {
+    const { data, error } = await requireSupabase()
+      .from('workspace_members')
+      .select('workspace:workspaces(*)')
+      .eq('user_id', userId)
+    if (error) throw error
+    return (data ?? [])
+      .map((m) => (m as unknown as { workspace: Workspace | null }).workspace)
+      .filter((w): w is Workspace => Boolean(w))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+
   async searchProfiles(query: string): Promise<Profile[]> {
     const { data, error } = await requireSupabase()
       .from('profiles')
@@ -291,12 +303,14 @@ export class SupabaseBackend implements Backend {
   }
 
   /**
-   * Add someone to the workspace by email.
+   * Pair up with someone by email: they join your workspace and you join
+   * theirs, so access is mutual.
    *
-   * Client-side lookup only finds people who already have an Atlas account —
-   * there is no server to send an invite email from. `invite_member_by_email`
-   * is a SECURITY DEFINER function so the lookup can see profiles the caller
-   * otherwise can't read.
+   * Only finds people who already have an Atlas account — there is no server to
+   * send an invite email from. `invite_member_by_email` is SECURITY DEFINER
+   * both so the lookup can see profiles the caller can't otherwise read, and
+   * because adding yourself to their workspace is something RLS would (rightly)
+   * refuse from the client.
    */
   async inviteMember(email: string): Promise<WorkspaceMember> {
     const sb = requireSupabase()
@@ -323,13 +337,13 @@ export class SupabaseBackend implements Backend {
     return member as WorkspaceMember
   }
 
+  /** Undoes both directions of the pairing — see `unpair_member` in schema.sql. */
   async removeMember(userId: string) {
     if (!this.workspaceId) throw new Error('No workspace loaded')
-    const { error } = await requireSupabase()
-      .from('workspace_members')
-      .delete()
-      .eq('workspace_id', this.workspaceId)
-      .eq('user_id', userId)
+    const { error } = await requireSupabase().rpc('unpair_member', {
+      p_workspace_id: this.workspaceId,
+      p_user_id: userId,
+    })
     if (error) throw error
   }
 

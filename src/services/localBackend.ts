@@ -137,6 +137,10 @@ export class LocalBackend implements Backend {
     this.flush()
   }
 
+  async listWorkspaces() {
+    return this.snapshot ? [this.snapshot.workspace] : []
+  }
+
   async inviteMember(): Promise<never> {
     throw new UnsupportedInLocalMode('Inviting someone')
   }

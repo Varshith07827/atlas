@@ -25,6 +25,7 @@ export class LocalBackend implements Backend {
   private snapshot: Snapshot | null = null
 
   async loadSnapshot(user: AuthUser): Promise<Snapshot> {
+    // Local mode has exactly one workspace; `workspaceId` is ignored.
     const raw = localStorage.getItem(KEY)
     if (raw) {
       try {
@@ -33,6 +34,10 @@ export class LocalBackend implements Backend {
         this.snapshot = {
           ...buildEmptyShape(user, parsed.workspace?.id ?? uid()),
           ...parsed,
+        }
+        // Snapshots written before workspace switching existed have no list.
+        if (!this.snapshot.workspaces?.length) {
+          this.snapshot.workspaces = [this.snapshot.workspace]
         }
         return this.snapshot
       } catch {
@@ -122,6 +127,13 @@ export class LocalBackend implements Backend {
   async saveSettings(settings: Settings) {
     if (!this.snapshot) return
     this.snapshot.settings = settings
+    this.flush()
+  }
+
+  async renameWorkspace(_id: string, name: string) {
+    if (!this.snapshot) return
+    this.snapshot.workspace = { ...this.snapshot.workspace, name }
+    this.snapshot.workspaces = [this.snapshot.workspace]
     this.flush()
   }
 

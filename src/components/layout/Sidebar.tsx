@@ -2,7 +2,9 @@ import { useMemo } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   CalendarDays,
+  Check,
   ChevronRight,
+  ChevronsUpDown,
   CloudOff,
   FileText,
   Folder,
@@ -13,6 +15,7 @@ import {
   Search,
   Settings,
   Squircle,
+  Users,
 } from 'lucide-react'
 import { isCloud } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
@@ -21,6 +24,13 @@ import { inboxTasks, todayTasks } from '@/store/selectors'
 import { useUI } from '@/store/ui'
 import { Avatar, Icon, Kbd } from '@/components/ui/misc'
 import { Tooltip } from '@/components/ui/controls'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/menu'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -41,6 +51,9 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const user = useData((s) => s.user)
   const syncing = useData((s) => s.syncing)
   const createProject = useData((s) => s.createProject)
+  const workspace = useData((s) => s.workspace)
+  const workspaces = useData((s) => s.workspaces)
+  const switchWorkspace = useData((s) => s.switchWorkspace)
 
   const setPaletteOpen = useUI((s) => s.setPaletteOpen)
   const setQuickAddOpen = useUI((s) => s.setQuickAddOpen)
@@ -72,6 +85,56 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </Tooltip>
         )}
       </div>
+
+      {/* Only worth the space once there is somewhere to switch to. */}
+      {workspaces.length > 1 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="mb-2 flex items-center gap-2 rounded-[var(--radius-md)] border border-border px-2 py-1.5 text-left transition-colors hover:border-border-strong">
+              <span
+                className={cn(
+                  'grid size-5 shrink-0 place-items-center rounded-[6px]',
+                  workspace?.owner_id === user?.id ? 'bg-elevated' : 'bg-accent-soft',
+                )}
+              >
+                {workspace?.owner_id === user?.id ? (
+                  <Folder className="size-3 text-muted" />
+                ) : (
+                  <Users className="size-3 text-accent" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[12px] font-medium">
+                {workspace?.name ?? 'Workspace'}
+              </span>
+              <ChevronsUpDown className="size-3 shrink-0 text-faint" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+            {workspaces.map((w) => {
+              const mine = w.owner_id === user?.id
+              return (
+                <DropdownMenuItem
+                  key={w.id}
+                  onSelect={() => {
+                    void switchWorkspace(w.id)
+                    onNavigate?.()
+                  }}
+                >
+                  {mine ? <Folder className="size-4" /> : <Users className="size-4" />}
+                  <span className="min-w-0 flex-1 truncate">{w.name}</span>
+                  <span className="shrink-0 text-[10px] text-faint">
+                    {mine ? 'Owner' : 'Shared'}
+                  </span>
+                  {w.id === workspace?.id && (
+                    <Check className="size-3.5 shrink-0 text-accent" />
+                  )}
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
 
       <button
         onClick={() => {

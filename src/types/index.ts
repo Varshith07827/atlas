@@ -223,7 +223,10 @@ export interface Settings {
 
 /** Everything the app holds in memory. One fetch fills all of it. */
 export interface Snapshot {
+  /** The workspace currently being viewed. */
   workspace: Workspace
+  /** Every workspace this user can reach — their own plus any they were invited to. */
+  workspaces: Workspace[]
   members: WorkspaceMember[]
   projects: Project[]
   tasks: Task[]

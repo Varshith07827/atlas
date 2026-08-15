@@ -29,6 +29,9 @@ import { SupabaseBackend } from '@/services/supabaseBackend'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
+/** Which workspace to reopen next time, per device. */
+const WORKSPACE_KEY = 'atlas.workspaceId'
+
 interface DataState extends Omit<Snapshot, 'workspace' | 'settings'> {
   status: Status
   error: string | null
@@ -39,8 +42,10 @@ interface DataState extends Omit<Snapshot, 'workspace' | 'settings'> {
   /** True while a write is in flight, for subtle "saving…" affordances. */
   syncing: boolean
 
-  load: (user: AuthUser) => Promise<void>
+  load: (user: AuthUser, workspaceId?: string) => Promise<void>
   reset: () => void
+  switchWorkspace: (id: string) => Promise<void>
+  renameWorkspace: (name: string) => Promise<void>
 
   createTask: (input: Partial<Task> & { title: string }) => Promise<Task | null>
   updateTask: (id: string, patch: Partial<Task>) => Promise<void>
@@ -91,6 +96,7 @@ interface DataState extends Omit<Snapshot, 'workspace' | 'settings'> {
 }
 
 const EMPTY = {
+  workspaces: [] as Workspace[],
   members: [] as WorkspaceMember[],
   projects: [] as Project[],
   tasks: [] as Task[],
@@ -105,7 +111,7 @@ const EMPTY = {
 }
 
 /** Which state key holds each table's rows. */
-const STATE_KEY: Record<TableName, keyof typeof EMPTY> = {
+const STATE_KEY: Record<TableName, Exclude<keyof typeof EMPTY, 'workspaces'>> = {
   projects: 'projects',
   tasks: 'tasks',
   labels: 'labels',
@@ -169,11 +175,15 @@ export const useData = create<DataState>((set, get) => {
     backend: null,
     syncing: false,
 
-    async load(user) {
+    async load(user, workspaceId) {
       set({ status: 'loading', error: null, user })
       const backend: Backend = isCloud ? new SupabaseBackend() : new LocalBackend()
+      const wanted = workspaceId ?? localStorage.getItem(WORKSPACE_KEY) ?? undefined
       try {
-        const snap = await backend.loadSnapshot(user)
+        const snap = await backend.loadSnapshot(user, wanted)
+        // Store what we actually got, not what we asked for — the backend may
+        // have fallen back if the requested workspace is no longer reachable.
+        localStorage.setItem(WORKSPACE_KEY, snap.workspace.id)
         set({
           ...snap,
           backend,
@@ -182,6 +192,37 @@ export const useData = create<DataState>((set, get) => {
         })
       } catch (err) {
         set({ status: 'error', error: (err as Error).message })
+      }
+    },
+
+    /**
+     * Reopen everything against a different workspace.
+     *
+     * A full reload rather than a partial swap: every array in the store is
+     * scoped to one workspace, so re-fetching is both simpler and less likely
+     * to leave one list showing the previous workspace's rows.
+     */
+    async switchWorkspace(id) {
+      const { user, workspace } = get()
+      if (!user || !id || id === workspace?.id) return
+      await get().load(user, id)
+    },
+
+    async renameWorkspace(name) {
+      const { workspace, backend } = get()
+      const next = name.trim()
+      if (!workspace || !backend || !next || next === workspace.name) return
+      const before = { workspace, workspaces: get().workspaces }
+      const updated = { ...workspace, name: next }
+      set({
+        workspace: updated,
+        workspaces: get().workspaces.map((w) => (w.id === workspace.id ? updated : w)),
+      })
+      try {
+        await backend.renameWorkspace(workspace.id, next)
+      } catch (err) {
+        set(before)
+        toast.error((err as Error).message)
       }
     },
 

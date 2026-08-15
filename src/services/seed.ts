@@ -204,13 +204,19 @@ export function buildSeed(user: AuthUser, workspaceId: string): Snapshot {
       })),
   )
 
+  const firstName = (user.display_name ?? user.email.split('@')[0] ?? '').split(' ')[0]
+  const workspace = {
+    id: workspaceId,
+    // Named after its owner: once you can be in two workspaces, "My workspace"
+    // twice over in the switcher is useless.
+    name: firstName ? `${firstName}'s workspace` : 'My workspace',
+    owner_id: me,
+    created_at: now,
+  }
+
   return {
-    workspace: {
-      id: workspaceId,
-      name: 'My workspace',
-      owner_id: me,
-      created_at: now,
-    },
+    workspace,
+    workspaces: [workspace],
     members: [
       {
         workspace_id: workspaceId,

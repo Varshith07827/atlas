@@ -66,8 +66,15 @@ export interface AuthUser {
 export interface Backend {
   readonly kind: 'local' | 'cloud'
 
-  /** Fetch (or create, on first run) everything the app holds in memory. */
-  loadSnapshot(user: AuthUser): Promise<Snapshot>
+  /**
+   * Fetch (or create, on first run) everything the app holds in memory.
+   *
+   * `workspaceId` picks which workspace to open. It is a preference, not a
+   * demand: if the user is no longer a member of it (an invite was revoked,
+   * say) the backend falls back to one they can actually reach rather than
+   * failing to load.
+   */
+  loadSnapshot(user: AuthUser, workspaceId?: string): Promise<Snapshot>
 
   insert<T extends TableName>(table: T, row: TableRowMap[T]): Promise<void>
   update<T extends TableName>(
@@ -86,6 +93,9 @@ export interface Backend {
   setTaskLabels(taskId: string, labelIds: string[]): Promise<void>
 
   saveSettings(settings: Settings): Promise<void>
+
+  /** Rename a workspace. Owner only — the database enforces that too. */
+  renameWorkspace(id: string, name: string): Promise<void>
 
   /** Workspace sharing. Local mode reports these as unsupported. */
   inviteMember(email: string): Promise<WorkspaceMember>

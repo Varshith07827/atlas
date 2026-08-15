@@ -47,11 +47,30 @@ const PG: Record<TableName, string> = {
   notifications: 'notifications',
 }
 
+/**
+ * Choose which workspace to open, given everything the user can reach.
+ *
+ * Extracted from the fetch so it can be tested on its own — this is the rule
+ * that was wrong before: preferring the owned workspace unconditionally meant
+ * an invited member could never reach the workspace they were invited to,
+ * because signing up always gives you one of your own.
+ */
+export function pickWorkspace(
+  spaces: Workspace[],
+  userId: string,
+  preferredId?: string,
+): Workspace | null {
+  if (!spaces.length) return null
+  const preferred = preferredId ? spaces.find((s) => s.id === preferredId) : null
+  const owned = spaces.find((s) => s.owner_id === userId)
+  return preferred ?? owned ?? spaces[0]
+}
+
 export class SupabaseBackend implements Backend {
   readonly kind = 'cloud' as const
   private workspaceId: string | null = null
 
-  async loadSnapshot(user: AuthUser): Promise<Snapshot> {
+  async loadSnapshot(user: AuthUser, workspaceId?: string): Promise<Snapshot> {
     const sb = requireSupabase()
 
     // Keep the profile row in step with the auth record. The DB trigger creates
@@ -66,7 +85,7 @@ export class SupabaseBackend implements Backend {
       { onConflict: 'id' },
     )
 
-    const workspace = await this.resolveWorkspace(user)
+    const { workspace, workspaces } = await this.resolveWorkspace(user, workspaceId)
     this.workspaceId = workspace.id
 
     const w = workspace.id
@@ -124,6 +143,7 @@ export class SupabaseBackend implements Backend {
 
     return {
       workspace,
+      workspaces,
       members: (members.data ?? []) as WorkspaceMember[],
       projects: (projects.data ?? []) as Project[],
       tasks: (tasks.data ?? []) as Task[],
@@ -140,11 +160,18 @@ export class SupabaseBackend implements Backend {
   }
 
   /**
-   * Find the workspace this user belongs to, creating and seeding one on first
-   * login. A user can be a member of several (their own plus a friend's); the
-   * one they own wins, so the default view is always your own stuff.
+   * Work out which workspace to open, and list every one the user can reach.
+   *
+   * Order of preference: the one explicitly asked for (the switcher's choice,
+   * remembered per device), then the one they own, then anything they were
+   * invited to. A stale request — an invite since revoked — quietly falls back
+   * instead of erroring, because being unable to open the app is far worse than
+   * landing in the wrong workspace.
    */
-  private async resolveWorkspace(user: AuthUser): Promise<Workspace> {
+  private async resolveWorkspace(
+    user: AuthUser,
+    preferredId?: string,
+  ): Promise<{ workspace: Workspace; workspaces: Workspace[] }> {
     const sb = requireSupabase()
 
     const { data: memberships, error } = await sb
@@ -157,9 +184,13 @@ export class SupabaseBackend implements Backend {
       .map((m) => (m as unknown as { workspace: Workspace | null }).workspace)
       .filter((x): x is Workspace => Boolean(x))
 
-    const owned = spaces.find((s) => s.owner_id === user.id)
-    if (owned) return owned
-    if (spaces.length) return spaces[0]
+    const chosen = pickWorkspace(spaces, user.id, preferredId)
+    if (chosen) {
+      return {
+        workspace: chosen,
+        workspaces: [...spaces].sort((a, b) => a.name.localeCompare(b.name)),
+      }
+    }
 
     // First login: create the workspace and fill it with the same starter
     // content local mode gets.
@@ -187,7 +218,16 @@ export class SupabaseBackend implements Backend {
     await sb.from('habits').insert(seed.habits)
     await sb.from('habit_logs').insert(seed.habit_logs)
 
-    return created as Workspace
+    const workspace = created as Workspace
+    return { workspace, workspaces: [workspace] }
+  }
+
+  async renameWorkspace(id: string, name: string) {
+    const { error } = await requireSupabase()
+      .from('workspaces')
+      .update({ name })
+      .eq('id', id)
+    if (error) throw error
   }
 
   async insert<T extends TableName>(table: T, row: TableRowMap[T]) {

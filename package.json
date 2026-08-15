@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
+    "test:workspace": "node scripts/test-workspace-pick.mjs",
     "check:supabase": "node scripts/check-supabase.mjs",
     "deploy": "npm run build && gh-pages -d dist"
   },

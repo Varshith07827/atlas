@@ -112,11 +112,27 @@ turn it back on later once you've wired up a real mail provider.
 1. They sign up in your deployed Atlas first (there's no server here to send an
    invitation email from, so the account has to exist).
 2. You go to **Settings → Workspace**, type their email, and click **Invite**.
+   Only the workspace owner can do this.
 
-They'll see your shared projects, tasks, and notes, and changes show up live on
-both screens. Anything marked **private** stays yours alone — the database
-enforces that, not just the interface. Habits are always personal, so your
-streaks never merge with theirs.
+Everyone keeps their **own** workspace and can switch into any they've been
+invited to, using the switcher at the top of the sidebar. It only appears once
+you can reach more than one. Your choice is remembered per device, so your
+laptop and your phone can sit in different workspaces.
+
+**What the other person can see**
+
+| | Shared | Personal |
+| --- | --- | --- |
+| Projects, tasks, notes, calendar events, labels, comments | ✅ both of you | |
+| Anything flagged **private** | | 🔒 creator only |
+| Habit definitions | ✅ same list | |
+| Habit logs and streaks | | 🔒 yours alone |
+| Notifications, settings, theme | | 🔒 yours alone |
+
+So they see the Dashboard, Inbox, Board, Calendar, Projects and Notes filled
+with the shared workspace's content, updating live. The private flag and the
+habit split are enforced by row level security in the database, not by the
+interface — a modified client cannot read past them.
 
 ---
 
@@ -217,8 +233,10 @@ the difference between an app that feels instant and one that feels broken.
 ### Commands
 
 ```bash
-npm run dev       # dev server
-npm run build     # typecheck + production build
-npm run lint      # typecheck only
-npm run preview   # serve the build locally
+npm run dev             # dev server
+npm run build           # typecheck + production build
+npm run lint            # typecheck only
+npm run preview         # serve the build locally
+npm run test:workspace  # regression test for workspace selection
+npm run check:supabase  # verify a Supabase project is wired up correctly
 ```

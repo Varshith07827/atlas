@@ -79,6 +79,7 @@ export function SettingsPage() {
   const members = useData((s) => s.members)
   const inviteMember = useData((s) => s.inviteMember)
   const removeMember = useData((s) => s.removeMember)
+  const renameWorkspace = useData((s) => s.renameWorkspace)
   const state = useData()
 
   const theme = useUI((s) => s.theme)
@@ -86,6 +87,7 @@ export function SettingsPage() {
 
   const [displayName, setDisplayName] = useState(user?.display_name ?? '')
   const [inviteEmail, setInviteEmail] = useState('')
+  const [workspaceName, setWorkspaceName] = useState(workspace?.name ?? '')
   const [inviting, setInviting] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
   const [permission, setPermission] = useState(notificationPermission())
@@ -134,6 +136,8 @@ export function SettingsPage() {
     URL.revokeObjectURL(url)
     toast.success('Exported')
   }
+
+  const isOwner = workspace?.owner_id === user?.id
 
   const themes: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
     { value: 'dark', label: 'Dark', icon: <Moon className="size-3.5" /> },
@@ -298,11 +302,28 @@ export function SettingsPage() {
         <Section
           title="Workspace"
           description={
-            isCloud
-              ? `${workspace?.name ?? 'Workspace'} — invite one friend to share projects and tasks.`
-              : 'Sharing needs a Supabase project.'
+            !isCloud
+              ? 'Sharing needs a Supabase project.'
+              : isOwner
+                ? 'Everyone here sees the same projects, tasks and notes. Private items and habit streaks stay yours.'
+                : `Shared with you. Anything you mark private stays yours alone.`
           }
         >
+          {isOwner && (
+            <Row label="Name" hint="Shown in the workspace switcher.">
+              <Input
+                value={workspaceName}
+                onChange={(e) => setWorkspaceName(e.target.value)}
+                onBlur={() => {
+                  if (workspaceName.trim()) void renameWorkspace(workspaceName)
+                  else setWorkspaceName(workspace?.name ?? '')
+                }}
+                onKeyDown={onEnter(() => void renameWorkspace(workspaceName))}
+                className="w-52"
+              />
+            </Row>
+          )}
+
           {members.map((m) => (
             <Row
               key={m.user_id}
@@ -329,7 +350,7 @@ export function SettingsPage() {
             </Row>
           ))}
 
-          {isCloud && (
+          {isCloud && isOwner && (
             <div className="px-3.5 py-3">
               <form
                 className="flex items-center gap-2"
